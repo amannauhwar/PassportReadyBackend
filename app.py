@@ -46,14 +46,14 @@ def generate_upload_url():
         upload_url = s3_client.generate_presigned_url(
             ClientMethod="put_object",
             Params={"Bucket": UPLOAD_BUCKET_NAME, "Key": file_name},
-            ExpiresIn=3600  # Valid for 1 hour
+            ExpiresIn=200  # Valid for 1 hour
         )
         
         # 2. Generate the DOWNLOAD URL (GET)
         download_url = s3_client.generate_presigned_url(
             ClientMethod="get_object",                               
             Params={"Bucket": DOWNLOAD_BUCKET_NAME, "Key": file_name},
-            ExpiresIn=20  # Valid for 20 seconds
+            ExpiresIn=100  # Valid for 20 seconds
         )
 
         return jsonify({
