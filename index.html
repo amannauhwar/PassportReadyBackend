@@ -4,109 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>S3 File Uploader</title>
-    <style>
-        :root {
-            --primary-color: #007bff;
-            --success-color: #28a745;
-            --error-color: #dc3545;
-            --light-grey: #f8f9fa;
-            --dark-grey: #343a40;
-            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        }
-
-        body {
-            font-family: var(--font-family);
-            background-color: var(--light-grey);
-            color: var(--dark-grey);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
-            box-sizing: border-box;
-        }
-
-        main {
-            background-color: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            padding: 2rem 3rem;
-            width: 100%;
-            max-width: 500px;
-            text-align: center;
-        }
-
-        h2 {
-            margin-top: 0;
-            color: var(--dark-grey);
-        }
-
-        /* This hides the ugly default file input */
-        #file-input {
-            display: none;
-        }
-
-        /* This is the new, styled button */
-        .file-label {
-            display: inline-block;
-            background-color: var(--primary-color);
-            color: white;
-            padding: 12px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: background-color 0.2s ease;
-            margin-bottom: 1rem;
-        }
-
-        .file-label:hover {
-            background-color: #0056b3;
-        }
-
-        #file-name {
-            display: block;
-            margin-bottom: 1.5rem;
-            color: #6c757d;
-            font-style: italic;
-        }
-
-        #upload-button {
-            background-color: var(--success-color);
-            color: white;
-            font-size: 1rem;
-            font-weight: 600;
-            padding: 12px 30px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            width: 100%;
-            transition: background-color 0.2s ease;
-        }
-
-        #upload-button:hover {
-            background-color: #218838;
-        }
-
-        #status {
-            font-size: 0.9rem;
-            margin-top: 1.5rem;
-            font-weight: 500;
-        }
-
-        .status-success {
-            color: var(--success-color);
-        }
-
-        .status-error {
-            color: var(--error-color);
-        }
-
-        .status-info {
-            color: var(--dark-grey);
-        }
-
-    </style>
+    
+    <link rel="stylesheet" href="style.css">
+    
 </head>
 <body>
 
@@ -125,7 +25,10 @@
     </main>
 
     <script>
-        const API_SERVER_URL = "https://passportready.onrender.com"; 
+        // === CONFIGURATION ===
+        // ▼▼▼ PASTE YOUR RENDER SERVER URL HERE ▼▼▼
+        const API_SERVER_URL = "https://your-server-name.onrender.com"; // e.g., "https://my-s3-uploader.onrender.com"
+        // =====================
 
 
         // Get references to the HTML elements
@@ -184,25 +87,30 @@
                     body: selectedFile
                 });
 
-                if (!uploadResponse.ok) {
-                    throw new Error('Upload to S3 failed.');
+                if (uploadResponse.ok) {
+                    setStatus("Upload successful! Processing file...", "success");
+
+                    // +++ THIS IS THE 6-SECOND PAUSE +++
+                    // We wait 6 seconds (6000ms) to give the backend
+                    // time to copy the file to the download bucket.
+                    await new Promise(resolve => setTimeout(resolve, 6000)); 
+
+                    setStatus("Download starting...", "success");
+
+                    // STEP 3: Trigger the DOWNLOAD
+                    const link = document.createElement('a');
+                    link.href = downloadUrl;
+                    link.download = selectedFile.name; // Use the original file name
+                    
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    setStatus("Download started.", "success");
+
+                } else {
+                    setStatus("Upload to S3 failed.", "error");
                 }
-
-                // STEP 3: Trigger the DOWNLOAD
-                setStatus("Upload successful! Starting download...", "success");
-                
-                // This 'wait' gives the user time to read the success message
-                await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second delay
-                
-                const link = document.createElement('a');
-                link.href = downloadUrl;
-                link.download = selectedFile.name; // Use the original file name
-                
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-
-                setStatus("Download started.", "success");
 
             } catch (error) {
                 console.error("Upload process failed:", error);
