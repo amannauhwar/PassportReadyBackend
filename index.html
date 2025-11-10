@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S3 File Uploader</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --success-color: #28a745;
+            --error-color: #dc3545;
+            --light-grey: #f8f9fa;
+            --dark-grey: #343a40;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--light-grey);
+            color: var(--dark-grey);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        main {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            padding: 2rem 3rem;
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: var(--dark-grey);
+        }
+
+        /* This hides the ugly default file input */
+        #file-input {
+            display: none;
+        }
+
+        /* This is the new, styled button */
+        .file-label {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+            margin-bottom: 1rem;
+        }
+
+        .file-label:hover {
+            background-color: #0056b3;
+        }
+
+        #file-name {
+            display: block;
+            margin-bottom: 1.5rem;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        #upload-button {
+            background-color: var(--success-color);
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s ease;
+        }
+
+        #upload-button:hover {
+            background-color: #218838;
+        }
+
+        #status {
+            font-size: 0.9rem;
+            margin-top: 1.5rem;
+            font-weight: 500;
+        }
+
+        .status-success {
+            color: var(--success-color);
+        }
+
+        .status-error {
+            color: var(--error-color);
+        }
+
+        .status-info {
+            color: var(--dark-grey);
+        }
+
+    </style>
+</head>
+<body>
+
+    <main>
+        <h2>Upload Your File</h2>
+        <p>Select a file to upload and download a processed version.</p>
+
+        <label for="file-input" class="file-label">Choose File</label>
+        <input type="file" id="file-input" />
+        
+        <span id="file-name">No file selected</span>
+        
+        <button id="upload-button">Upload and Download</button>
+        
+        <p id="status" class="status-info"></p>
+    </main>
+
+    <script>
+        // === CONFIGURATION ===
+        // ▼▼▼ PASTE YOUR RENDER SERVER URL HERE ▼▼▼
+        const API_SERVER_URL = "https://your-server-name.onrender.com"; 
+        // =====================
+
+
+        // Get references to the HTML elements
+        const fileInput = document.getElementById('file-input');
+        const fileLabel = document.querySelector('.file-label');
+        const fileNameDisplay = document.getElementById('file-name');
+        const uploadButton = document.getElementById('upload-button');
+        const statusMessage = document.getElementById('status');
+        let selectedFile = null;
+
+        // Update the file name display when a file is chosen
+        fileInput.addEventListener('change', () => {
+            selectedFile = fileInput.files[0];
+            if (selectedFile) {
+                fileNameDisplay.textContent = selectedFile.name;
+                fileLabel.textContent = "Change File";
+            } else {
+                fileNameDisplay.textContent = "No file selected";
+                fileLabel.textContent = "Choose File";
+                selectedFile = null;
+            }
+        });
+
+        // Helper function to set the status message
+        function setStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = `status-${type}`; // e.g., 'status-error'
+        }
+
+        // Main upload logic
+        uploadButton.addEventListener('click', async () => {
+            if (!selectedFile) {
+                setStatus("Please select a file first.", "error");
+                return;
+            }
+
+            setStatus("Requesting upload URL...", "info");
+
+            try {
+                // STEP 1: Ask our Python server for the URLs
+                const response = await fetch(`${API_SERVER_URL}/generate-upload-url?filename=${selectedFile.name}`);
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to get URL from server');
+                }
+                
+                const data = await response.json();
+                const uploadUrl = data.upload_url;
+                const downloadUrl = data.download_url;
+
+                // STEP 2: Use the presigned URL to UPLOAD the file to S3
+                setStatus("Uploading file to S3...", "info");
+                const uploadResponse = await fetch(uploadUrl, {
+                    method: 'PUT',
+                    body: selectedFile
+                });
+
+                if (!uploadResponse.ok) {
+                    throw new Error('Upload to S3 failed.');
+                }
+
+                // STEP 3: Trigger the DOWNLOAD
+                setStatus("Upload successful! Starting download...", "success");
+                
+                // This 'wait' gives the user time to read the success message
+                await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second delay
+                
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = selectedFile.name; // Use the original file name
+                
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                setStatus("Download started.", "success");
+
+            } catch (error) {
+                console.error("Upload process failed:", error);
+                setStatus(`Error: ${error.message}`, "error");
+            }
+        });
+    </script>
+</body>
+</html>
